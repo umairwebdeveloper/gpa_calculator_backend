@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from .models import db, Student
-from .utils import calculate_new_gpa
+from .utils import calculate_new_gpa, calculate_target_gpa
 
 main_bp = Blueprint("main", __name__)
 
@@ -71,7 +71,7 @@ def get_students_with_courses():
     except Exception as e:
         # Handle unexpected errors
         return jsonify({"error": str(e)}), 500
-    
+
 
 @main_bp.route("/calculate_gpa", methods=["POST"])
 def calculate_gpa():
@@ -107,4 +107,37 @@ def calculate_gpa():
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
         # Handle unexpected errors
+        return jsonify({"error": f"Internal server error: {str(e)}"}), 500
+
+@main_bp.route("/calculate_target_gpa", methods=["POST"])
+def calculate_target_gpa_route():
+    try:
+        print(23)
+        data = request.get_json(force=True)
+        print(33)
+        student_id = data.get("student_id")
+        target_gpa = data.get("target_gpa")
+        remaining_credits = data.get("remaining_credits")
+        num_courses = data.get("num_courses")
+        print(data)
+
+        # Validate inputs
+        if not all([student_id, target_gpa, remaining_credits, num_courses]):
+            return jsonify({"error": "All fields are required"}), 400
+
+        student = Student.query.filter_by(student_id=student_id).first()
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Calculate required grades
+        result = calculate_target_gpa(
+            student.current_total_points_gpa,
+            student.current_total_registered_credits_gpa,
+            target_gpa,
+            remaining_credits,
+            num_courses,
+        )
+
+        return jsonify(result), 200
+    except Exception as e:
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500

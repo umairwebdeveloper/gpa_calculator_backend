@@ -1,20 +1,9 @@
 from .models import db, Student, Course, Enrollment
 from uuid import uuid4
+import random
 
-
-def calculate_new_gpa(student_id, courses_data):
-    """
-    Calculate Semester GPA, Updated GPA, and MGPA based on user input.
-    Fetch data from the database and handle new course creation.
-    """
-    # Fetch the student
-    student = Student.query.filter_by(student_id=student_id).first()
-    if not student:
-        raise ValueError("Student not found")
-    print(student)
-
-    # Grade scale mapping
-    grade_scale = {
+# Grade scale mapping
+GRADE_SCALE = {
         "A": 4.0,
         "A-": 3.7,
         "B+": 3.3,
@@ -27,6 +16,17 @@ def calculate_new_gpa(student_id, courses_data):
         "D": 1.0,
         "F": 0.0,
     }
+
+def calculate_new_gpa(student_id, courses_data):
+    """
+    Calculate Semester GPA, Updated GPA, and MGPA based on user input.
+    Fetch data from the database and handle new course creation.
+    """
+    # Fetch the student
+    student = Student.query.filter_by(student_id=student_id).first()
+    if not student:
+        raise ValueError("Student not found")
+    print(student)
 
     new_total_points = 0
     new_registered_credits = 0
@@ -72,8 +72,8 @@ def calculate_new_gpa(student_id, courses_data):
 
             if previous_enrollment:
                 previous_grade = previous_enrollment.grade
-                previous_points = grade_scale.get(previous_grade, 0.0) * credits
-                new_points = grade_scale.get(new_grade, 0.0) * credits
+                previous_points = GRADE_SCALE.get(previous_grade, 0.0) * credits
+                new_points = GRADE_SCALE.get(new_grade, 0.0) * credits
 
                 if new_points > previous_points:
                     replacement_points += new_points - previous_points
@@ -81,7 +81,7 @@ def calculate_new_gpa(student_id, courses_data):
                 continue  # Skip further processing as repeated courses don't add new credits
 
         # Add new course points and credits
-        new_points = grade_scale.get(new_grade, 0.0) * credits
+        new_points = GRADE_SCALE.get(new_grade, 0.0) * credits
         new_total_points += new_points
         new_registered_credits += credits
 
@@ -148,4 +148,64 @@ def calculate_new_gpa(student_id, courses_data):
         "semester_gpa": round(semester_gpa, 2),
         "new_gpa": round(new_gpa, 2),
         "new_mgpa": round(new_mgpa, 2),
+    }
+
+
+def calculate_target_gpa(
+    current_points, current_credits, target_gpa, remaining_credits, num_courses
+):
+    """
+    Generate exactly `num_courses` grades to achieve the target GPA.
+    """
+    if target_gpa < 0 or target_gpa > 4.0:
+        return {"error": "Invalid target GPA. It must be between 0.0 and 4.0."}
+
+    if remaining_credits <= 0 or num_courses <= 0:
+        return {"error": "Remaining credits and number of courses must be positive."}
+
+    if remaining_credits < num_courses:
+        return {"error": "Remaining credits cannot be less than the number of courses."}
+
+    required_points = (
+        target_gpa * (current_credits + remaining_credits) - current_points
+    )
+
+    if required_points <= 0:
+        return {
+            "error": "Target GPA is already achieved or no additional points are needed."
+        }
+
+    if required_points > remaining_credits * 4.0:
+        return {
+            "error": "Target GPA is unachievable with the given remaining credits and courses."
+        }
+
+    credits_per_course = remaining_credits / num_courses
+    selected_grades = []
+    total_points_generated = 0
+
+    # Generate grades for all but the last course
+    for _ in range(num_courses - 1):
+        grade = random.choice(list(GRADE_SCALE.keys()))
+        grade_points = GRADE_SCALE[grade] * credits_per_course
+        selected_grades.append(grade)
+        total_points_generated += grade_points
+
+    # Adjust the last course grade to balance the total points
+    remaining_points = required_points - total_points_generated
+    last_grade = min(
+        (
+            grade
+            for grade, points in GRADE_SCALE.items()
+            if points * credits_per_course >= remaining_points
+        ),
+        key=lambda g: abs(GRADE_SCALE[g] * credits_per_course - remaining_points),
+        default="A+",
+    )
+    selected_grades.append(last_grade)
+
+    return {
+        "target_gpa": target_gpa,
+        "required_points": round(required_points, 2),
+        "random_solution": selected_grades,
     }
