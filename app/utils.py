@@ -1,7 +1,6 @@
 from .models import db, Student, Course, Enrollment
 from uuid import uuid4
 import random
-
 # Grade scale mapping
 GRADE_SCALE = {
     "A": 4.0,
@@ -107,43 +106,41 @@ def calculate_new_gpa(student_id, courses_data):
         new_total_points / new_registered_credits if new_registered_credits > 0 else 0,
         4.0,
     )
+    
+    print('New total points', new_total_points,new_registered_credits)
 
     # Updated GPA
-    updated_total_points_gpa = (
-        student.current_total_points_gpa + new_total_points + replacement_points
+    total_gpa_points = (
+        (
+            student.current_total_points_gpa
+            * student.current_total_registered_credits_gpa
+        )
+        + new_total_points
+        + replacement_points
     )
-    updated_total_credits_gpa = (
+    total_gpa_credits = (
         student.current_total_registered_credits_gpa + new_registered_credits
     )
     new_gpa = min(
-        (
-            updated_total_points_gpa / updated_total_credits_gpa
-            if updated_total_credits_gpa > 0
-            else 0
-        ),
+        (total_gpa_points / total_gpa_credits) if total_gpa_credits > 0 else 0,
         4.0,
     )
 
     # Updated MGPA
-    updated_total_points_mgpa = student.current_total_points_mgpa + major_points
-    updated_total_credits_mgpa = (
-        student.current_total_registered_credits_mgpa + major_credits
-    )
+    total_mgpa_points = (
+        student.current_total_points_mgpa * student.current_total_registered_credits_gpa
+    ) + major_points
+    total_mgpa_credits = student.current_total_registered_credits_gpa + major_credits
     new_mgpa = min(
-        (
-            updated_total_points_mgpa / updated_total_credits_mgpa
-            if updated_total_credits_mgpa > 0
-            else 0
-        ),
+        (total_mgpa_points / total_mgpa_credits) if total_mgpa_credits > 0 else 0,
         4.0,
     )
 
     # Update student totals in the database
-    student.current_total_points_gpa = updated_total_points_gpa
-    student.current_total_registered_credits_gpa = updated_total_credits_gpa
-    student.current_total_points_mgpa = updated_total_points_mgpa
-    student.current_total_registered_credits_mgpa = updated_total_credits_mgpa
-    db.session.commit()
+    # student.current_total_points_gpa = new_gpa
+    # student.current_total_registered_credits_gpa = total_gpa_credits
+    # student.current_total_points_mgpa = new_mgpa
+    # db.session.commit()
 
     # Return results
     return {

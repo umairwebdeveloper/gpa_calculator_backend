@@ -11,6 +11,8 @@ class Student(db.Model):
     current_total_registered_credits_gpa = db.Column(db.Float, default=0.0)
     current_total_points_mgpa = db.Column(db.Float, default=0.0)
     current_total_registered_credits_mgpa = db.Column(db.Float, default=0.0)
+    user_id = db.Column(db.String(1000), unique=True, nullable=True)
+    is_major = db.Column(db.String(50), nullable=True)
 
     # Relationship with Enrollment
     enrollments = db.relationship("Enrollment", backref="student", lazy=True)
