@@ -78,68 +78,96 @@ def get_students_with_courses():
 @main_bp.route("/calculate_gpa", methods=["POST"])
 def calculate_gpa():
     try:
-        # Parse JSON request body
-        data = request.get_json(force=True)
-    except Exception:
-        return jsonify({"error": "Invalid JSON or missing Content-Type header"}), 415
+        try:
+            # Parse JSON request body
+            data = request.get_json(force=True)
+        except Exception:
+            return (
+                jsonify({"error": "Invalid JSON or missing Content-Type header"}),
+                415,
+            )
 
-    # Validate required keys in the payload
-    if "student_id" not in data or "courses" not in data:
-        return (
-            jsonify(
-                {"error": "Invalid payload: 'student_id' and 'courses' are required"}
-            ),
-            400,
-        )
+        # Validate required keys in the payload
+        if "courses" not in data:
+            return (
+                jsonify(
+                    {
+                        "error": "Invalid payload: 'student_id' and 'courses' are required"
+                    }
+                ),
+                400,
+            )
 
-    student_id = data["student_id"]
-    courses_data = data["courses"]
+        student_id = data.get("student_id")
+        courses_data = data["courses"]
 
-    # Check if the student exists
-    student = Student.query.filter_by(student_id=student_id).first()
-    if not student:
-        return jsonify({"error": f"Student with ID {student_id} not found"}), 404
+        if student_id:
+            student = Student.query.filter_by(student_id=student_id).first()
+            if not student:
+                return (
+                    jsonify({"error": f"Student with ID {student_id} not found"}),
+                    404,
+                )
 
-    # Call the GPA calculation function with database-integrated logic
-    try:
-        result = calculate_new_gpa(student_id, courses_data)
+            # Call the GPA calculation function with database-integrated logic
+            result = calculate_new_gpa(student_id, courses_data)
+        else:
+            gpa = data.get("gpa")
+            mgpa = data.get("mgpa")
+            total_credits = data.get("total_credits")
+
+            custom_data = {
+                "current_total_points_gpa": gpa,  # Current total GPA points
+                "current_total_registered_credits_gpa": total_credits,  # Current total registered GPA credits
+                "current_total_points_mgpa": mgpa,  # Current total MGPA points
+                "current_total_registered_credits_mgpa": 0,  # Current total registered MGPA credits
+            }
+
+            result = calculate_new_gpa(
+                student_id=None, courses_data=courses_data, custom_data=custom_data
+            )
+
         return jsonify(result), 200
-    except ValueError as ve:
-        # Handle specific errors raised in calculate_new_gpa
-        return jsonify({"error": str(ve)}), 400
     except Exception as e:
-        # Handle unexpected errors
         return jsonify({"error": f"Internal server error: {str(e)}"}), 500
 
 
 @main_bp.route("/calculate_target_gpa", methods=["POST"])
 def calculate_target_gpa_route():
     try:
-        print(23)
         data = request.get_json(force=True)
-        print(33)
         student_id = data.get("student_id")
         target_gpa = data.get("target_gpa")
         remaining_credits = data.get("remaining_credits")
         num_courses = data.get("num_courses")
-        print(data)
 
         # Validate inputs
-        if not all([student_id, target_gpa, remaining_credits, num_courses]):
+        if not all([target_gpa, remaining_credits, num_courses]):
             return jsonify({"error": "All fields are required"}), 400
 
-        student = Student.query.filter_by(student_id=student_id).first()
-        if not student:
-            return jsonify({"error": "Student not found"}), 404
+        if student_id:
+            student = Student.query.filter_by(student_id=student_id).first()
+            if not student:
+                return jsonify({"error": "Student not found"}), 404
 
-        # Calculate required grades
-        result = calculate_target_gpa(
-            student.current_total_points_gpa,
-            student.current_total_registered_credits_gpa,
-            target_gpa,
-            remaining_credits,
-            num_courses,
-        )
+            # Calculate required grades
+            result = calculate_target_gpa(
+                student.current_total_points_gpa,
+                student.current_total_registered_credits_gpa,
+                target_gpa,
+                remaining_credits,
+                num_courses,
+            )
+        else:
+            gpa = data.get("gpa")
+            total_credits = data.get("total_credits")
+            result = calculate_target_gpa(
+                gpa,
+                total_credits,
+                target_gpa,
+                remaining_credits,
+                num_courses,
+            )
 
         return jsonify(result), 200
     except Exception as e:
